@@ -2,7 +2,11 @@ package net.igenius.mqttservice;
 
 import android.content.Context;
 import android.content.Intent;
+import android.support.annotation.Nullable;
+import android.support.annotation.RawRes;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 import static net.igenius.mqttservice.MQTTService.NAMESPACE;
@@ -35,6 +39,8 @@ public class MQTTServiceCommand {
     public static final String PARAM_BROADCAST_TYPE = "broadcastType";
     public static final String PARAM_EXCEPTION = "exception";
     public static final String PARAM_AUTO_RESUBSCRIBE_ON_RECONNECT = "autoResubscribeOnReconnect";
+    public static final String PARAM_CERTIFICATE_RES_ID = "certificateResId";
+    public static final String PARAM_CERTIFICATE_PASSWORD = "certificatePassword";
 
     public static final String BROADCAST_EXCEPTION = "exception";
     public static final String BROADCAST_CONNECTION_SUCCESS = "connectionSuccess";
@@ -62,6 +68,31 @@ public class MQTTServiceCommand {
                 PARAM_USERNAME, username,
                 PARAM_PASSWORD, password
         );
+    }
+
+    /**
+     * Connects to an MQTT broker with a certificate
+     * @param context application context
+     * @param brokerUrl Url to which to connect. Example: ssl://mqtt.server.com:1234 or tcp://mqtt.server.com:1234
+     * @param clientId client ID to give to this client
+     * @param username username
+     * @param password password
+     * @return request Id, to be used in receiver to track events associated to this request
+     */
+    public static String connect(final Context context, final String brokerUrl,
+                                 final String clientId, final String username,
+                                 final String password,
+                                 @Nullable @RawRes final Integer certificateRawResId,
+                                 @Nullable final String certificatePassword) {
+        final Map<String, Object> map = new HashMap<>();
+        map.put(PARAM_BROKER_URL, brokerUrl);
+        map.put(PARAM_CLIENT_ID, clientId);
+        map.put(PARAM_USERNAME, username);
+        map.put(PARAM_PASSWORD, password);
+        map.put(PARAM_CERTIFICATE_RES_ID, certificateRawResId);
+        map.put(PARAM_CERTIFICATE_PASSWORD, certificatePassword);
+
+        return startService(context, ACTION_CONNECT, null, map);
     }
 
     /**
@@ -197,12 +228,34 @@ public class MQTTServiceCommand {
         if (params != null && params.length > 0 && params.length % 2 != 0)
             throw new IllegalArgumentException("Parameters must be passed in the form: PARAM_NAME, paramValue");
 
+        final Map<String, Object> map = new HashMap<>();
+        if (params != null && params.length > 0) {
+            for (int i = 0; i <= params.length - 2; i += 2) {
+                map.put(params[i], params[i + 1]);
+            }
+        }
+
+        return startService(context, action, payload, map);
+    }
+
+    private static String startService(final Context context,
+                                       final String action,
+                                       final byte[] payload,
+                                       final Map<String, Object> params) {
         Intent intent = new Intent(context, MQTTService.class);
         intent.setAction(action);
 
-        if (params != null && params.length > 0) {
-            for (int i = 0; i <= params.length - 2; i += 2) {
-                intent.putExtra(params[i], params[i + 1]);
+        for (Map.Entry<String, Object> kvp : params.entrySet()) {
+            if(kvp.getValue() == null){
+                continue;
+            }
+
+            if(kvp.getValue() instanceof String){
+                intent.putExtra(kvp.getKey(), (String) kvp.getValue());
+            } else if(kvp.getValue() instanceof Integer){
+                intent.putExtra(kvp.getKey(), (Integer) kvp.getValue());
+            } else if(kvp.getValue() instanceof Boolean){
+                intent.putExtra(kvp.getKey(), (Integer) kvp.getValue());
             }
         }
 

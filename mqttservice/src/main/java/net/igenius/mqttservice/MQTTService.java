@@ -1,6 +1,8 @@
 package net.igenius.mqttservice;
 
 import android.content.Intent;
+import android.support.annotation.Nullable;
+import android.support.annotation.RawRes;
 
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.MqttCallbackExtended;
@@ -33,6 +35,8 @@ import static net.igenius.mqttservice.MQTTServiceCommand.BROADCAST_SUBSCRIPTION_
 import static net.igenius.mqttservice.MQTTServiceCommand.PARAM_AUTO_RESUBSCRIBE_ON_RECONNECT;
 import static net.igenius.mqttservice.MQTTServiceCommand.PARAM_BROADCAST_TYPE;
 import static net.igenius.mqttservice.MQTTServiceCommand.PARAM_BROKER_URL;
+import static net.igenius.mqttservice.MQTTServiceCommand.PARAM_CERTIFICATE_PASSWORD;
+import static net.igenius.mqttservice.MQTTServiceCommand.PARAM_CERTIFICATE_RES_ID;
 import static net.igenius.mqttservice.MQTTServiceCommand.PARAM_CLIENT_ID;
 import static net.igenius.mqttservice.MQTTServiceCommand.PARAM_CONNECTED;
 import static net.igenius.mqttservice.MQTTServiceCommand.PARAM_EXCEPTION;
@@ -151,9 +155,16 @@ public class MQTTService extends BackgroundService implements Runnable, MqttCall
             String requestId = getParameter(intent, PARAM_REQUEST_ID);
 
             if (ACTION_CONNECT.equals(action) || ACTION_CONNECT_AND_SUBSCRIBE.equals(action)) {
+                Integer certificateRawResId = null;
+                String certificatePassword = null;
+                if(intent.hasExtra(PARAM_CERTIFICATE_RES_ID)){
+                    certificateRawResId = intent.getIntExtra(PARAM_CERTIFICATE_RES_ID, 0);
+                    certificatePassword = intent.getStringExtra(PARAM_CERTIFICATE_PASSWORD);
+                }
+
                 boolean connected = onConnect(requestId, getParameter(intent, PARAM_BROKER_URL),
                         getParameter(intent, PARAM_CLIENT_ID), getParameter(intent, PARAM_USERNAME),
-                        getParameter(intent, PARAM_PASSWORD));
+                        getParameter(intent, PARAM_PASSWORD), certificateRawResId, certificatePassword);
 
                 if (ACTION_CONNECT_AND_SUBSCRIBE.equals(action) && connected) {
                     int qos = getInt(getParameter(intent, PARAM_QOS));
@@ -194,7 +205,9 @@ public class MQTTService extends BackgroundService implements Runnable, MqttCall
                               final String brokerUrl,
                               final String clientId,
                               final String username,
-                              final String password) {
+                              final String password,
+                              @Nullable @RawRes final Integer certificatResId,
+                              @Nullable final String certificatePassword) {
 
         MQTTServiceLogger.debug(getClass().getSimpleName(), requestId + " Connect to "
                 + brokerUrl + " with user: " + username + " and password: " + password);
@@ -218,6 +231,11 @@ public class MQTTService extends BackgroundService implements Runnable, MqttCall
                 connectOptions.setAutomaticReconnect(true);
                 connectOptions.setKeepAliveInterval(KEEP_ALIVE_INTERVAL);
                 connectOptions.setConnectionTimeout(CONNECT_TIMEOUT);
+
+                if(certificatResId != null && certificatePassword != null){
+                    MQTTServiceLogger.debug("onConnect", "Setting up the SSL certificate");
+                    connectOptions.setSocketFactory(new SslUtility(getApplicationContext()).getSocketFactory(certificatResId, certificatePassword));
+                }
 
                 mClient.connect(connectOptions);
                 MQTTServiceLogger.debug("onConnect", "Connected");
