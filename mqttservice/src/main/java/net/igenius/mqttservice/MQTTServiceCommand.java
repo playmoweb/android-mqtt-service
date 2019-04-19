@@ -3,6 +3,7 @@ package net.igenius.mqttservice;
 import android.content.Context;
 import android.content.Intent;
 import android.support.annotation.Nullable;
+import android.support.annotation.RawRes;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -87,7 +88,7 @@ public class MQTTServiceCommand {
     public static String connect(final Context context, final String brokerUrl,
                                  final String clientId, final String username,
                                  final String password,
-                                 @Nullable final String certificateCAPath,
+                                 @Nullable @RawRes final Integer certificateCAPath,
                                  @Nullable final String certificatePath,
                                  @Nullable final String certificateKeyPath,
                                  @Nullable final String certificatePassword) {
