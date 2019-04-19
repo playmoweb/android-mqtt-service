@@ -1,5 +1,8 @@
 package net.igenius.mqttservice;
 
+import android.content.Context;
+import android.support.annotation.RawRes;
+
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.openssl.PEMKeyPair;
@@ -8,10 +11,13 @@ import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
 import org.bouncycastle.util.io.pem.PemObject;
 import org.bouncycastle.util.io.pem.PemReader;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
 import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyStore;
@@ -19,6 +25,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Security;
+import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
@@ -36,11 +43,11 @@ import javax.net.ssl.TrustManagerFactory;
  */
 class SslUtility {
 
-    public static SSLSocketFactory getSocketFactory(final String caCrtFile, final String crtFile, final String keyFile, final String password) throws Exception {
+    public static SSLSocketFactory getSocketFactory(Context context, @RawRes final Integer caCrtFile, final String crtFile, final String keyFile, final String password) {
         try {
             Security.addProvider(new BouncyCastleProvider());
 
-            X509Certificate caCert = getCertificate(caCrtFile);
+            X509Certificate caCert = getCertificate(context, caCrtFile);
             X509Certificate cert = getCertificate(crtFile);
             FileReader fileReader = new FileReader(keyFile);
             PEMParser parser = new PEMParser(fileReader);
@@ -61,15 +68,15 @@ class SslUtility {
             KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
             ks.load(null, null);
             ks.setCertificateEntry("certificate", cert);
-            ks.setKeyEntry("private-key", rdKey, password.toCharArray(), new java.security.cert.Certificate[]{cert});
+            ks.setKeyEntry("private-key", rdKey, password.toCharArray(), new Certificate[]{cert});
             KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
             kmf.init(ks, password.toCharArray());
 
             // finally, create SSL socket factory
-            SSLContext context = SSLContext.getInstance("TLSv1");
-            context.init(kmf.getKeyManagers(), tmf.getTrustManagers(), null);
+            SSLContext sslContext = SSLContext.getInstance("TLSv1.2");
+            sslContext.init(kmf.getKeyManagers(), tmf.getTrustManagers(), null);
 
-            return context.getSocketFactory();
+            return sslContext.getSocketFactory();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -77,27 +84,42 @@ class SslUtility {
     }
 
     //return certificate
-    private static java.security.cert.X509Certificate getCertificate(String pemfile) throws Exception {
-        java.security.cert.X509Certificate cert = null;
+    private static X509Certificate getCertificate(String pemfile) throws Exception {
+        X509Certificate cert = null;
         try {
-            FileReader fRd = new FileReader(pemfile);
-            final PemReader certReader = new PemReader(fRd);
-            final PemObject certAsPemObject = certReader.readPemObject();
-
-            if (!certAsPemObject.getType().equalsIgnoreCase("CERTIFICATE")) {
-                throw new Exception("Certificate file does not contain a certificate but a " + certAsPemObject.getType());
-            }
-            final byte[] x509Data = certAsPemObject.getContent();
-            final CertificateFactory fact = CertificateFactory.getInstance("X509");
-            cert = (X509Certificate) fact.generateCertificate(new ByteArrayInputStream(x509Data));
-            if (cert == null) {
-                throw new Exception("Certificate file does not contain an X509 certificate");
-            }
-
+            FileReader reader = new FileReader(pemfile);
+            cert = extract(reader);
         } catch (FileNotFoundException e) {
             throw new IOException("Can't find file " + pemfile);
         } catch (Exception e) {
-            System.out.println("#Exceotion :" + e.getMessage());
+            System.out.println("#Exception :" + e.getMessage());
+        }
+        return cert;
+    }
+
+    private static X509Certificate getCertificate(Context context, Integer pemRawId){
+        X509Certificate cert = null;
+        try {
+            BufferedReader reader = new BufferedReader(new InputStreamReader(context.getResources().openRawResource(pemRawId)));
+            cert = extract(reader);
+        } catch (Exception e) {
+            System.out.println("#Exception :" + e.getMessage());
+        }
+        return cert;
+    }
+
+    private static X509Certificate extract(Reader reader) throws Exception {
+        final PemReader certReader = new PemReader(reader);
+        final PemObject certAsPemObject = certReader.readPemObject();
+
+        if (!certAsPemObject.getType().equalsIgnoreCase("CERTIFICATE")) {
+            throw new Exception("Certificate file does not contain a certificate but a " + certAsPemObject.getType());
+        }
+        final byte[] x509Data = certAsPemObject.getContent();
+        final CertificateFactory fact = CertificateFactory.getInstance("X509");
+        X509Certificate cert = (X509Certificate) fact.generateCertificate(new ByteArrayInputStream(x509Data));
+        if (cert == null) {
+            throw new Exception("Certificate file does not contain an X509 certificate");
         }
         return cert;
     }

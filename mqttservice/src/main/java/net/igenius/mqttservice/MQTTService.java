@@ -2,6 +2,7 @@ package net.igenius.mqttservice;
 
 import android.content.Intent;
 import android.support.annotation.Nullable;
+import android.support.annotation.RawRes;
 
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.MqttCallbackExtended;
@@ -156,13 +157,13 @@ public class MQTTService extends BackgroundService implements Runnable, MqttCall
             String requestId = getParameter(intent, PARAM_REQUEST_ID);
 
             if (ACTION_CONNECT.equals(action) || ACTION_CONNECT_AND_SUBSCRIBE.equals(action)) {
-                String certificateCAPath = null;
+                Integer certificateCAPath = null;
                 String certificatePath = null;
                 String certificateKeyPath = null;
                 String certificatePassword = null;
 
                 if (intent.hasExtra(PARAM_CERTIFICATE_PATH)) {
-                    certificateCAPath = intent.getStringExtra(PARAM_CERTIFICATE_CA_PATH);
+                    certificateCAPath = intent.getIntExtra(PARAM_CERTIFICATE_CA_PATH, 0);
                     certificatePath = intent.getStringExtra(PARAM_CERTIFICATE_PATH);
                     certificateKeyPath = intent.getStringExtra(PARAM_CERTIFICATE_KEY_PATH);
                     certificatePassword = intent.getStringExtra(PARAM_CERTIFICATE_PASSWORD);
@@ -213,7 +214,7 @@ public class MQTTService extends BackgroundService implements Runnable, MqttCall
                               final String clientId,
                               final String username,
                               final String password,
-                              @Nullable final String certificateCAPath,
+                              @Nullable @RawRes final Integer certificateCAPath,
                               @Nullable final String certificatePath,
                               @Nullable final String certificateKeyPath,
                               @Nullable final String certificatePassword) {
@@ -243,7 +244,7 @@ public class MQTTService extends BackgroundService implements Runnable, MqttCall
 
                 if (certificatePath != null && certificatePassword != null) {
                     MQTTServiceLogger.debug("onConnect", "Setting up the SSL certificate");
-                    connectOptions.setSocketFactory(SslUtility.getSocketFactory(certificateCAPath, certificatePath, certificateKeyPath, certificatePassword));
+                    connectOptions.setSocketFactory(SslUtility.getSocketFactory(getApplicationContext(), certificateCAPath, certificatePath, certificateKeyPath, certificatePassword));
                 }
 
                 mClient.connect(connectOptions);
