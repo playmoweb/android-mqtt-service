@@ -2,7 +2,6 @@ package net.igenius.mqttservice;
 
 import android.content.Intent;
 import android.support.annotation.Nullable;
-import android.support.annotation.RawRes;
 
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.MqttCallbackExtended;
@@ -35,8 +34,10 @@ import static net.igenius.mqttservice.MQTTServiceCommand.BROADCAST_SUBSCRIPTION_
 import static net.igenius.mqttservice.MQTTServiceCommand.PARAM_AUTO_RESUBSCRIBE_ON_RECONNECT;
 import static net.igenius.mqttservice.MQTTServiceCommand.PARAM_BROADCAST_TYPE;
 import static net.igenius.mqttservice.MQTTServiceCommand.PARAM_BROKER_URL;
+import static net.igenius.mqttservice.MQTTServiceCommand.PARAM_CERTIFICATE_CA_PATH;
+import static net.igenius.mqttservice.MQTTServiceCommand.PARAM_CERTIFICATE_KEY_PATH;
 import static net.igenius.mqttservice.MQTTServiceCommand.PARAM_CERTIFICATE_PASSWORD;
-import static net.igenius.mqttservice.MQTTServiceCommand.PARAM_CERTIFICATE_RES_ID;
+import static net.igenius.mqttservice.MQTTServiceCommand.PARAM_CERTIFICATE_PATH;
 import static net.igenius.mqttservice.MQTTServiceCommand.PARAM_CLIENT_ID;
 import static net.igenius.mqttservice.MQTTServiceCommand.PARAM_CONNECTED;
 import static net.igenius.mqttservice.MQTTServiceCommand.PARAM_EXCEPTION;
@@ -130,7 +131,7 @@ public class MQTTService extends BackgroundService implements Runnable, MqttCall
         if (intent != null) {
             if (intent.getAction() == null || intent.getAction().isEmpty()) {
                 MQTTServiceLogger.error("MQTTService onStartCommand",
-                                        "null or empty Intent passed, ignoring it!");
+                        "null or empty Intent passed, ignoring it!");
             } else {
                 mShutdown = false;
                 mIntents.offer(intent);
@@ -155,16 +156,22 @@ public class MQTTService extends BackgroundService implements Runnable, MqttCall
             String requestId = getParameter(intent, PARAM_REQUEST_ID);
 
             if (ACTION_CONNECT.equals(action) || ACTION_CONNECT_AND_SUBSCRIBE.equals(action)) {
-                Integer certificateRawResId = null;
+                String certificateCAPath = null;
+                String certificatePath = null;
+                String certificateKeyPath = null;
                 String certificatePassword = null;
-                if(intent.hasExtra(PARAM_CERTIFICATE_RES_ID)){
-                    certificateRawResId = intent.getIntExtra(PARAM_CERTIFICATE_RES_ID, 0);
+
+                if (intent.hasExtra(PARAM_CERTIFICATE_PATH)) {
+                    certificateCAPath = intent.getStringExtra(PARAM_CERTIFICATE_CA_PATH);
+                    certificatePath = intent.getStringExtra(PARAM_CERTIFICATE_PATH);
+                    certificateKeyPath = intent.getStringExtra(PARAM_CERTIFICATE_KEY_PATH);
                     certificatePassword = intent.getStringExtra(PARAM_CERTIFICATE_PASSWORD);
                 }
 
                 boolean connected = onConnect(requestId, getParameter(intent, PARAM_BROKER_URL),
                         getParameter(intent, PARAM_CLIENT_ID), getParameter(intent, PARAM_USERNAME),
-                        getParameter(intent, PARAM_PASSWORD), certificateRawResId, certificatePassword);
+                        getParameter(intent, PARAM_PASSWORD),
+                        certificateCAPath, certificatePath, certificateKeyPath, certificatePassword);
 
                 if (ACTION_CONNECT_AND_SUBSCRIBE.equals(action) && connected) {
                     int qos = getInt(getParameter(intent, PARAM_QOS));
@@ -206,7 +213,9 @@ public class MQTTService extends BackgroundService implements Runnable, MqttCall
                               final String clientId,
                               final String username,
                               final String password,
-                              @Nullable @RawRes final Integer certificatResId,
+                              @Nullable final String certificateCAPath,
+                              @Nullable final String certificatePath,
+                              @Nullable final String certificateKeyPath,
                               @Nullable final String certificatePassword) {
 
         MQTTServiceLogger.debug(getClass().getSimpleName(), requestId + " Connect to "
@@ -232,9 +241,9 @@ public class MQTTService extends BackgroundService implements Runnable, MqttCall
                 connectOptions.setKeepAliveInterval(KEEP_ALIVE_INTERVAL);
                 connectOptions.setConnectionTimeout(CONNECT_TIMEOUT);
 
-                if(certificatResId != null && certificatePassword != null){
+                if (certificatePath != null && certificatePassword != null) {
                     MQTTServiceLogger.debug("onConnect", "Setting up the SSL certificate");
-                    connectOptions.setSocketFactory(new SslUtility(getApplicationContext()).getSocketFactory(certificatResId, certificatePassword));
+                    connectOptions.setSocketFactory(SslUtility.getSocketFactory(certificateCAPath, certificatePath, certificateKeyPath, certificatePassword));
                 }
 
                 mClient.connect(connectOptions);
@@ -342,7 +351,7 @@ public class MQTTService extends BackgroundService implements Runnable, MqttCall
     private void onPublish(final String requestId, final String topic, final byte[] payload) {
         if (!clientIsConnected()) {
             broadcastException(BROADCAST_EXCEPTION, requestId,
-                               new Exception("Can't publish to topic: " + topic + ", client not connected!"));
+                    new Exception("Can't publish to topic: " + topic + ", client not connected!"));
             return;
         }
 

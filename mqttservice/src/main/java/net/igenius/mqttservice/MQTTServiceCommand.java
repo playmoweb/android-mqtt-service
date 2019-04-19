@@ -3,7 +3,6 @@ package net.igenius.mqttservice;
 import android.content.Context;
 import android.content.Intent;
 import android.support.annotation.Nullable;
-import android.support.annotation.RawRes;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -39,7 +38,9 @@ public class MQTTServiceCommand {
     public static final String PARAM_BROADCAST_TYPE = "broadcastType";
     public static final String PARAM_EXCEPTION = "exception";
     public static final String PARAM_AUTO_RESUBSCRIBE_ON_RECONNECT = "autoResubscribeOnReconnect";
-    public static final String PARAM_CERTIFICATE_RES_ID = "certificateResId";
+    public static final String PARAM_CERTIFICATE_CA_PATH = "certificateCAPath";
+    public static final String PARAM_CERTIFICATE_PATH = "certificatePath";
+    public static final String PARAM_CERTIFICATE_KEY_PATH = "certificateKeyPath";
     public static final String PARAM_CERTIFICATE_PASSWORD = "certificatePassword";
 
     public static final String BROADCAST_EXCEPTION = "exception";
@@ -77,19 +78,27 @@ public class MQTTServiceCommand {
      * @param clientId client ID to give to this client
      * @param username username
      * @param password password
+     * @param certificateCAPath Full path to the certificate CA file
+     * @param certificatePath Full path to the certificate file
+     * @param certificateKeyPath Full path to the certificate key file
+     * @param certificatePassword Certificate password
      * @return request Id, to be used in receiver to track events associated to this request
      */
     public static String connect(final Context context, final String brokerUrl,
                                  final String clientId, final String username,
                                  final String password,
-                                 @Nullable @RawRes final Integer certificateRawResId,
+                                 @Nullable final String certificateCAPath,
+                                 @Nullable final String certificatePath,
+                                 @Nullable final String certificateKeyPath,
                                  @Nullable final String certificatePassword) {
         final Map<String, Object> map = new HashMap<>();
         map.put(PARAM_BROKER_URL, brokerUrl);
         map.put(PARAM_CLIENT_ID, clientId);
         map.put(PARAM_USERNAME, username);
         map.put(PARAM_PASSWORD, password);
-        map.put(PARAM_CERTIFICATE_RES_ID, certificateRawResId);
+        map.put(PARAM_CERTIFICATE_CA_PATH, certificateCAPath);
+        map.put(PARAM_CERTIFICATE_PATH, certificatePath);
+        map.put(PARAM_CERTIFICATE_KEY_PATH, certificateKeyPath);
         map.put(PARAM_CERTIFICATE_PASSWORD, certificatePassword);
 
         return startService(context, ACTION_CONNECT, null, map);
